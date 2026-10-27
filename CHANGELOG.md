@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — local review candidate
+## 0.2.0 — 2026-10-27 experimental preview
 
 - Rename the project to Personal Model & Effort Router and make the Agent Skill the primary interface.
 - Add preference reuse, cold-start behavior, runtime capability checks, application/readback distinction and local feedback guidance.
