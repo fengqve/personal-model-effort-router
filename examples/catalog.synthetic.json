@@ -3,28 +3,28 @@
   "synthetic": true,
   "candidates": [
     {
-      "id": "small-low",
-      "model": "fictional-small-v1",
+      "id": "economy-low",
+      "model": "fictional-economy-v1",
       "effort": "low",
       "harness": "demo-v1"
     },
     {
-      "id": "small-high",
-      "model": "fictional-small-v1",
-      "effort": "high",
+      "id": "fast-medium",
+      "model": "fictional-fast-v1",
+      "effort": "medium",
       "harness": "demo-v1"
     },
     {
-      "id": "large-high",
-      "model": "fictional-large-v1",
+      "id": "careful-high",
+      "model": "fictional-careful-v1",
       "effort": "high",
       "harness": "demo-v1"
     }
   ],
-  "fallback": "large-high",
+  "fallback": "careful-high",
   "policy": {
     "min_cases": 5,
-    "min_pass_rate": 1.0,
+    "min_pass_rate": 0.8,
     "max_age_days": 30
   }
 }

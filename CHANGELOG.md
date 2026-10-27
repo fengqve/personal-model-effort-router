@@ -1,11 +1,14 @@
 # Changelog
 
-## 0.1.0 — prepared locally, not yet published
+## 0.2.0 — local review candidate
 
-- Compare model/effort configurations using complete-task evidence.
-- Apply matching, shared-case, sample, quality, cost, freshness and risk checks.
-- Explain decisions, abstentions and fallback.
-- Dispatch through an explicit local adapter and preserve result/failure state.
-- Include bilingual introduction, offline synthetic demo, methodology and tests.
+- Rename the project to Personal Model & Effort Router and make the Agent Skill the primary interface.
+- Add preference reuse, cold-start behavior, runtime capability checks, application/readback distinction and local feedback guidance.
+- Support cost/latency/quality objectives, available-candidate filtering and run-level evidence tracing.
+- Exclude unconfirmed configurations from calibration; preserve executor mismatches as unverified.
+- Migrate the helper into the self-contained Skill package; retain offline CLI inspection as a secondary interface.
+- Pass 29 automated tests and independent limited Agent behavior scenarios. No model-quality or savings claim.
 
-No real-model performance or savings claims. No provider integrations or semantic classifier included.
+## 0.1.0 — unpublished FitMyTask prototype
+
+Local CLI-first evidence comparison, explicit adapter and synthetic demonstration. This version was never published and is superseded by the Agent-first revision.

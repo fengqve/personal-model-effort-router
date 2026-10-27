@@ -1,0 +1,6 @@
+interface:
+  display_name: "Personal Model & Effort Router"
+  short_description: "Route models and effort using preferences and task outcomes"
+  default_prompt: "Use $route-model-effort to choose and apply an available model and reasoning effort for this task using my priorities and local outcomes."
+policy:
+  allow_implicit_invocation: true

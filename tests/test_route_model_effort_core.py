@@ -3,7 +3,12 @@ import math
 import unittest
 from datetime import datetime, timezone
 
-from fitmytask.core import ValidationError, evaluate, validate_catalog
+import sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'skills/route-model-effort/scripts'))
+
+from model_effort_router.core import ValidationError, evaluate, validate_catalog
 
 NOW = datetime(2026, 10, 27, tzinfo=timezone.utc)
 
@@ -28,7 +33,7 @@ def run(candidate, case, cost=1, passed=True, **kwargs):
               'harness': 'h', 'rubric': 'r', 'candidate_id': candidate, 'model': c['model'],
               'effort': c['effort'], 'passed': passed, 'total_cost_usd': cost,
               'total_duration_seconds': 2, 'completed_at': '2026-10-26T00:00:00Z',
-              'source': 'observed', 'evidence': 'local artifact'}
+              'source': 'observed', 'evidence': 'local artifact', 'configuration_confirmed': True}
     result.update(kwargs)
     return result
 

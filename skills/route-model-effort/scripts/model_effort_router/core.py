@@ -69,6 +69,8 @@ def validate_catalog(catalog):
     if not isinstance(catalog.get('fallback'), str) or catalog['fallback'] not in ids:
         raise ValidationError('catalog.fallback must name a candidate')
     policy = _object(catalog.get('policy'), 'catalog.policy')
+    if 'objective' in policy and policy['objective'] not in ('cost', 'latency', 'quality'):
+        raise ValidationError('policy.objective must be cost, latency, or quality')
     if type(policy.get('min_cases')) is not int or policy['min_cases'] < 1:
         raise ValidationError('policy.min_cases must be a positive integer')
     rate = _number(policy.get('min_pass_rate'), 'policy.min_pass_rate')
@@ -86,6 +88,14 @@ def validate_task(task):
     if task.get('risk') not in ('low', 'medium', 'high'):
         raise ValidationError('task.risk must be low, medium, or high')
     _bool(task.get('classification_confirmed'), 'task.classification_confirmed')
+    if 'objective' in task and task['objective'] not in ('cost', 'latency', 'quality'):
+        raise ValidationError('task.objective must be cost, latency, or quality')
+    if 'allowed_candidates' in task:
+        allowed = task['allowed_candidates']
+        if not isinstance(allowed, list) or any(not isinstance(cid, str) or not cid.strip() for cid in allowed):
+            raise ValidationError('task.allowed_candidates must be an array of candidate ids')
+        if len(set(allowed)) != len(allowed):
+            raise ValidationError('task.allowed_candidates must not contain duplicates')
     for key in ('max_mean_cost_usd', 'max_mean_duration_seconds'):
         if key in task:
             _number(task[key], f'task.{key}')
@@ -108,6 +118,7 @@ def _validate_runs(runs, candidates, now):
         if run.get('risk') not in ('low', 'medium', 'high'):
             raise ValidationError(f'{prefix}.risk is invalid')
         _bool(run.get('passed'), f'{prefix}.passed')
+        _bool(run.get('configuration_confirmed', False), f'{prefix}.configuration_confirmed')
         for key in ('total_cost_usd', 'total_duration_seconds'):
             if key not in run:
                 raise ValidationError(f'{prefix}.{key} is required (null if unknown)')
@@ -141,6 +152,10 @@ def evaluate(catalog, runs, task, *, allow_synthetic=False, now=None):
         raise ValidationError('now must be a timezone-aware UTC datetime')
     now = now.astimezone(timezone.utc)
     candidates = {c['id']: c for c in catalog['candidates']}
+    allowed = set(task.get('allowed_candidates', candidates))
+    if not allowed <= candidates.keys():
+        raise ValidationError('task.allowed_candidates references an unknown candidate')
+    objective = task.get('objective', catalog['policy'].get('objective', 'cost'))
     _validate_runs(runs, candidates, now)
     try:
         cutoff = now - timedelta(days=catalog['policy']['max_age_days'])
@@ -149,22 +164,25 @@ def evaluate(catalog, runs, task, *, allow_synthetic=False, now=None):
     grouped = {cid: {} for cid in candidates}
     for run in runs:
         if (any(run[k] != task[k] for k in ('family', 'risk', 'harness', 'rubric'))
+                or not run.get('configuration_confirmed', False)
                 or _date(run['completed_at'], 'completed_at') < cutoff
                 or (run['source'] == 'synthetic' and not allow_synthetic)):
             continue
         grouped[run['candidate_id']].setdefault(run['case_id'], []).append(run)
-    covered = [cid for cid, cases in grouped.items() if cases]
+    covered = [cid for cid, cases in grouped.items() if cases and cid in allowed]
     common = sorted(set.intersection(*(set(grouped[cid]) for cid in covered))) if covered else []
     results = []
     policy = catalog['policy']
     for cid, candidate in candidates.items():
         cases = grouped[cid]
-        selected_cases = [cases[case] for case in common] if cases else []
+        selected_cases = [cases[case] for case in common] if cid in allowed and cases else []
         n = len(selected_cases)
         pass_rate = (sum(all(r['passed'] for r in case) for case in selected_cases) / n) if n else None
         cost = _mean([_mean([r['total_cost_usd'] for r in case]) for case in selected_cases])
         duration = _mean([_mean([r['total_duration_seconds'] for r in case]) for case in selected_cases])
         reasons = []
+        if cid not in allowed:
+            reasons.append('not_available_or_allowed')
         if candidate['harness'] != task['harness']:
             reasons.append('harness_mismatch')
         if not cases:
@@ -173,14 +191,17 @@ def evaluate(catalog, runs, task, *, allow_synthetic=False, now=None):
             reasons.append('insufficient_common_cases')
         if pass_rate is None or pass_rate < policy['min_pass_rate']:
             reasons.append('pass_rate_below_threshold')
-        if cost is None:
+        if objective == 'cost' and cost is None:
             reasons.append('unknown_cost')
+        if objective == 'latency' and duration is None:
+            reasons.append('unknown_duration')
         if 'max_mean_cost_usd' in task and (cost is None or cost > task['max_mean_cost_usd']):
             reasons.append('cost_limit_unproven_or_exceeded')
         if 'max_mean_duration_seconds' in task and (duration is None or duration > task['max_mean_duration_seconds']):
             reasons.append('duration_limit_unproven_or_exceeded')
         results.append({'candidate_id': cid, 'n': n, 'pass_rate': pass_rate,
                         'mean_total_cost_usd': cost, 'mean_total_duration_seconds': duration,
+                        'evidence_run_ids': [r['id'] for case in selected_cases for r in case],
                         'reasons': reasons})
     eligible = [r for r in results if not r['reasons']]
     limitations = ['Thresholds are empirical and do not guarantee future quality.',
@@ -195,15 +216,25 @@ def evaluate(catalog, runs, task, *, allow_synthetic=False, now=None):
     if task['risk'] == 'high' or not task['classification_confirmed']:
         status, selected, reason = 'review_required', None, 'risk_or_classification_requires_review'
     elif eligible:
-        winner = min(eligible, key=lambda r: (r['mean_total_cost_usd'],
-                                               r['mean_total_duration_seconds'] if r['mean_total_duration_seconds'] is not None else math.inf,
-                                               r['candidate_id']))
-        status, selected, reason = 'selected', candidates[winner['candidate_id']], 'lowest_eligible_mean_cost'
+        def order(r):
+            cost = r['mean_total_cost_usd'] if r['mean_total_cost_usd'] is not None else math.inf
+            duration = r['mean_total_duration_seconds'] if r['mean_total_duration_seconds'] is not None else math.inf
+            if objective == 'quality':
+                return (-r['pass_rate'], cost, duration, r['candidate_id'])
+            if objective == 'latency':
+                return (duration, cost, r['candidate_id'])
+            return (cost, duration, r['candidate_id'])
+        winner = min(eligible, key=order)
+        reason = {'cost': 'lowest_eligible_mean_cost', 'latency': 'lowest_eligible_mean_duration',
+                  'quality': 'highest_eligible_pass_rate'}[objective]
+        status, selected = 'selected', candidates[winner['candidate_id']]
+    elif fallback['id'] not in allowed:
+        status, selected, reason = 'review_required', None, 'fallback_not_available_or_allowed'
     elif fallback['harness'] != task['harness']:
         status, selected, reason = 'review_required', None, 'fallback_harness_mismatch'
     elif limits and fallback_result['reasons']:
         status, selected, reason = 'review_required', None, 'fallback_limits_or_quality_unproven'
     else:
         status, selected, reason = 'fallback', fallback, 'no_eligible_candidate'
-    return {'status': status, 'selected': selected, 'reason': reason, 'candidates': results,
+    return {'status': status, 'selected': selected, 'reason': reason, 'objective': objective, 'candidates': results,
             'common_cases': common, 'limitations': limitations, 'simulation': allow_synthetic}

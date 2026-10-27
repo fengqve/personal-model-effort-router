@@ -3,16 +3,17 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fitmytask"
-version = "0.1.0"
-description = "Choose model and reasoning effort from your own task evidence."
+name = "personal-model-effort-router"
+version = "0.2.0"
+description = "Agent-first model and reasoning-effort routing from personal preferences and task outcomes."
 requires-python = ">=3.9"
 license = {text = "MIT"}
 readme = "README.md"
 dependencies = []
 
 [project.scripts]
-fitmytask = "fitmytask.cli:main"
+model-effort-router = "model_effort_router.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["fitmytask*"]
+where = ["skills/route-model-effort/scripts"]
+include = ["model_effort_router*"]

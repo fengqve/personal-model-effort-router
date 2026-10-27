@@ -1,17 +1,23 @@
 # Verification — 2026-10-27
 
-Verified locally on macOS with Python 3.9.6:
+## Deterministic behavior
 
-- `python3 -m unittest discover -s tests -v`: 22 tests passed.
-- `python3 -m fitmytask demo`: selected fictional small/high, with `simulation: true`.
-- Explicit fixture-file route with `--allow-synthetic`: same expected choice.
-- Mock adapter execution: selected model/effort and Chinese task content delivered through stdin; output acceptance saved, and the result consumed by the next routing decision.
-- Failure acceptance, malformed responses, nonzero adapter exit, timeout, preexisting output files, fallback opt-in and synthetic-dispatch blocking exercised offline.
-- Wheel built with setuptools 82.0.1 in an isolated local virtual environment, installed from the wheel, and its `fitmytask demo` console entry point executed outside the source repository.
-- English and Simplified Chinese README present; relative Markdown links checked.
+29 tests passed locally on macOS/Python 3.9.6: 12 core regressions, 12 CLI/adapter regressions, and 5 preference/availability/configuration-confirmation tests. Cases cover shared task inputs, failed/repeated attempts, unknown costs, quality/time/cost gates, unavailable candidates, unconfirmed/mismatched configuration, fallback, synthetic separation, timeout recovery and record reuse.
 
-The host's bundled setuptools 58.0.4 cannot correctly process this project's metadata when build isolation is bypassed. A trial with that unsupported builder produced UNKNOWN metadata and was rejected. Verification used a builder satisfying `pyproject.toml` instead. Normal pip build isolation resolves the declared build dependency; the no-install quickstart avoids packaging entirely.
+Skill quick validation, authoring/reference audit and the source monorepo validator passed. These are structural checks, not semantic quality proof.
 
-Tests use fabricated records and local mock programs. They verify implementation behavior, not real model performance, task classification accuracy, provider integration, total savings, or user demand. No provider API requests were made by the tests. GitHub Actions is configured for Python 3.9/3.12 but has not run remotely. No Windows/Linux runtime claim is made from these local checks.
+## Independent Agent forward test
 
-All example models and records are synthetic. No private task history or credentials are included in the release tree. Evidence pointers are validated as strings, not authenticated evidence. Actual integration needs its own verification and execution permissions.
+A separate Codex Agent read the source Skill and references without receiving the intended answer. It exercised:
+
+- A user-requested one-worker task under an existing gpt-6-luna / max baseline. One actual worker API request submitted the pair and returned the correctly deduplicated/sorted JSON array. The host accepted the request but exposed no independent effective-model/effort readback. The evaluator retained that uncertainty; full cost and elapsed time were unknown.
+- A scenario with no current-main-model switch and no permission for a new worker. It reported the limitation and did not create a worker or claim a switch.
+- Offline synthetic preference demos: cost, latency and quality selected economy-low, fast-medium and careful-high respectively, all marked simulation.
+
+This proves the observed behavior in these limited cases. It is not a model benchmark, classification accuracy measurement, cost-saving result or evidence of global automatic discovery.
+
+## Still unverified
+
+Installed host discovery; Claude Code/WorkBuddy or other host compatibility; provider-specific execution adapters; effective remote configuration readback; real personal model calibration; end-to-end economic benefit. Adapter statuses remain not-validated. The helper trusts evaluator declarations and does not authenticate remote evidence.
+
+GitHub Actions is configured but has not run remotely. No global installation, settings change, paid provider-API calibration, or publication occurred during this revision. The exported Skill fingerprint matched its source release manifest. The optional helper wheel was built with setuptools 82.0.1 in a local virtual environment, installed, and its console entry point returned the expected quality-demo selection outside the source tree. Both README languages and local Markdown links were checked.

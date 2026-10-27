@@ -45,12 +45,12 @@ def emit(value):
 def demo_data():
     """Entirely invented fixtures; never evidence about a real model."""
     candidates = [
-        {"id": "small-low", "model": "fictional-small-v1", "effort": "low", "harness": "demo-v1"},
-        {"id": "small-high", "model": "fictional-small-v1", "effort": "high", "harness": "demo-v1"},
-        {"id": "large-high", "model": "fictional-large-v1", "effort": "high", "harness": "demo-v1"},
+        {"id": "economy-low", "model": "fictional-economy-v1", "effort": "low", "harness": "demo-v1"},
+        {"id": "fast-medium", "model": "fictional-fast-v1", "effort": "medium", "harness": "demo-v1"},
+        {"id": "careful-high", "model": "fictional-careful-v1", "effort": "high", "harness": "demo-v1"},
     ]
     catalog = {"schema_version": 1, "synthetic": True, "candidates": candidates,
-               "fallback": "large-high", "policy": {"min_cases": 5, "min_pass_rate": 1.0, "max_age_days": 30}}
+               "fallback": "careful-high", "policy": {"min_cases": 5, "min_pass_rate": 0.8, "max_age_days": 30}}
     task = {"id": "new-demo-task", "family": "bounded-edit", "risk": "low", "harness": "demo-v1",
             "rubric": "tests-and-review-v1", "classification_confirmed": True,
             "prompt": "Fictional task used to demonstrate routing only."}
@@ -60,8 +60,8 @@ def demo_data():
             runs.append({"id": "%s-%s" % (candidate["id"], case), "case_id": "fixture-%s" % case,
                          **{key: task[key] for key in ("family", "risk", "harness", "rubric")},
                          "candidate_id": candidate["id"], "model": candidate["model"], "effort": candidate["effort"],
-                         "passed": index > 0 or case < 4, "total_cost_usd": [0.02, 0.08, 0.30][index],
-                         "total_duration_seconds": [10, 30, 90][index],
+                         "passed": index == 2 or case < 5, "total_cost_usd": [0.02, 0.08, 0.30][index],
+                         "total_duration_seconds": [45, 10, 90][index], "configuration_confirmed": True,
                          "completed_at": datetime.now(timezone.utc).isoformat(),
                          "source": "synthetic", "evidence": "Invented fixture, no model was called."})
     return catalog, runs, task
@@ -98,10 +98,15 @@ def dispatch(args, catalog, runs, task, decision):
             if not isinstance(response, dict):
                 raise ValueError("Adapter must return a JSON object")
             candidate = decision["selected"]
+            applied = response.get("applied_config")
+            expected = {key: candidate[key] for key in ("model", "effort", "harness")}
+            if applied is not None and applied != expected:
+                raise ValueError("Adapter applied_config does not match the requested configuration")
             record = {"id": str(uuid4()), "case_id": task["id"],
                       **{key: task[key] for key in ("family", "risk", "harness", "rubric")},
                       "candidate_id": candidate["id"], "model": candidate["model"], "effort": candidate["effort"],
                       "completed_at": datetime.now(timezone.utc).isoformat(), "source": "observed",
+                      "configuration_confirmed": applied is not None,
                       **{key: response[key] for key in ("passed", "total_cost_usd", "total_duration_seconds", "evidence")}}
             # Validate adapter evidence against the same rules used for routing.
             evaluate(catalog, [record], task)
@@ -116,6 +121,7 @@ def dispatch(args, catalog, runs, task, decision):
             output_file.truncate()
             raise ValueError("Adapter execution/result unverified; see reserved record. %s" % type(exc).__name__) from exc
     emit({"decision": decision, "record": str(record_path), "passed": record["passed"],
+          "configuration_confirmed": record["configuration_confirmed"],
           "output": response.get("output")})
     return 0 if record["passed"] else 3
 
@@ -123,7 +129,8 @@ def dispatch(args, catalog, runs, task, decision):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Choose a model + reasoning effort from your task evidence.")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("demo", help="Offline simulation; no model calls, no performance claims")
+    demo = sub.add_parser("demo", help="Offline simulation; no model calls, no performance claims")
+    demo.add_argument("--objective", choices=("cost", "latency", "quality"), default="cost")
     for name in ("route", "dispatch"):
         command = sub.add_parser(name)
         command.add_argument("--catalog", required=True)
@@ -139,6 +146,7 @@ def main(argv=None):
     try:
         if args.command == "demo":
             catalog, runs, task = demo_data()
+            task["objective"] = args.objective
             emit(evaluate(catalog, runs, task, allow_synthetic=True))
             return 0
         catalog, task = load(args.catalog), load(args.task)
@@ -149,5 +157,5 @@ def main(argv=None):
             return 2 if decision["status"] == "review_required" else 0
         return dispatch(args, catalog, runs, task, decision)
     except (ValueError, KeyError, TypeError, OSError) as exc:
-        print("fitmytask: %s" % exc, file=sys.stderr)
+        print("model_effort_router: %s" % exc, file=sys.stderr)
         return 1

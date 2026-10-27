@@ -1,73 +1,59 @@
-# FitMyTask
+# Personal Model & Effort Router
 
-**Choose a model and reasoning effort from your own task evidence.**
+**Let your agent choose the model and reasoning effort for your task, your priorities, and your observed results.**
 
-[简体中文](README.zh-CN.md) · [Evidence format](docs/evidence.md) · [Agent integration](docs/integration.md) · [Method and limits](docs/method.md)
+[简体中文](README.zh-CN.md) · [Read the Skill](skills/route-model-effort/SKILL.md) · [Validation](docs/verification.md)
 
-A new model is one reason to reconsider your defaults. A new task, a changed workflow, rising costs, or disappointing results are others.
+Model recommendations are useful starting points. The missing connection is applying them to your actual work: what quality you need, how long you can wait, what you can spend, and how each model/effort configuration has performed in your environment.
 
-FitMyTask is a small, local Python tool that turns complete-task evaluation records into an explainable model + effort decision. Keep your existing evaluator and execution stack. Bring their results; inspect the decision; let your agent call an explicitly supplied adapter.
+This project makes that decision an Agent workflow. A new model is only one trigger; changed tasks, priorities, tools or results matter too.
 
-**Status: experimental v0.1.0.** The included demo uses fictional models and invented results. No real-model advantage, cost saving, or classification accuracy has been demonstrated. This is a routing mechanism, not a published model recommendation.
+## Start with your agent
 
-## Try it in 30 seconds
+After opening this repository in your agent, say:
 
-Python 3.9+, no runtime dependencies, API key, network, or installation needed:
+> Read `skills/route-model-effort/SKILL.md`. For this task, use my existing model preferences and local outcomes to choose a model and reasoning effort. Quality comes first; preserve my current default when evidence is insufficient. Apply the choice only through controls this host actually supports, and tell me what was really applied.
 
-```sh
-python3 -m fitmytask demo
-python3 -m unittest discover -s tests -v
-```
+Your agent reads the Skill, interprets the task, prepares any needed evidence inputs, selects a configuration and uses the host's actual execution controls. You do not need to classify tasks or operate a Python CLI.
 
-Run these commands from the repository root. Optional installation from source: `python3 -m pip install .` then `fitmytask demo`. No PyPI release is claimed.
+For a host with Agent Skills support, the **complete** `skills/route-model-effort/` folder is the installable unit. Use the host's supported skill installation mechanism. Once installed, it can be explicitly invoked as `$route-model-effort` where that syntax is supported. Implicit invocation is enabled in the package metadata, but discovery and routing frequency depend on the host. Installing a Skill does not create a model-switching API or intercept every message. Installed discovery and other-host compatibility have not been verified here.
 
-The simulation compares six shared fixtures:
+## What the agent does
 
-| Fictional configuration | Cases passed | Mean complete-task cost | Decision |
-| --- | --- | --- | --- |
-| small / low | 4/6 | $0.02 | Fails the quality gate |
-| small / high | 6/6 | $0.08 | Selected in the simulation |
-| large / high | 6/6 | $0.30 | Eligible, more expensive in these fixtures |
+1. Reuse the user's current preferences, baseline and permitted model/effort configurations.
+2. Judge task ambiguity, context, acceptance checks, reversibility and failure cost.
+3. Use comparable local outcomes; treat official guidance as a prior when evidence is missing.
+4. Optimize the user's quality, latency or cost preference without silently relaxing requirements.
+5. Apply both settings through a supported session/worker/executor control, or say why it cannot.
+6. Verify the task and, where authorized, retain outcome evidence for the next decision.
 
-These numbers illustrate the code. They say nothing about any real model. A dispatch cannot use synthetic decisions.
+If the host exposes worker overrides but no main-session switch, the Skill does not claim to switch the main agent. It does not spawn redundant workers to simulate a switch. No local history is uploaded, no global configuration is changed, and no paid benchmark campaign starts merely because a new model appears.
 
-## Use your own evidence
+## Two parts, one workflow
 
-1. Freeze representative cases and acceptance criteria. Run the same cases through candidate model/effort configurations using your existing evaluator.
-2. Export one complete task attempt per JSONL record, including failures, retries, handoffs, and rework. Unknown costs are `null`, not zero. See [the format](docs/evidence.md).
-3. Have your host agent assign a known task family, risk, harness revision, and rubric. Unknown or uncertain classifications must set `classification_confirmed: false`.
-4. Ask for a decision:
+- **Primary interface:** [the Agent Skill](skills/route-model-effort/SKILL.md), including personalization, runtime application and evidence handling.
+- **Optional helper:** deterministic Python selection for structured task records. It supports cost/latency/quality objectives, availability filtering, shared-case comparisons, risk/quality gates, evidence references and an explicit executor bridge. The agent prepares and invokes it when useful.
+
+The helper requires Python 3.9+ with no runtime dependencies. An offline inspection command:
 
 ```sh
-python3 -m fitmytask route   --catalog private/catalog.json   --runs private/runs.jsonl   --task private/task.json
+python3 skills/route-model-effort/scripts/route.py demo --objective quality
 ```
 
-The JSON includes the selected model and effort, sample counts, observed pass rates, cost and duration, exclusions, and limitations. A high-risk or unconfirmed task returns `review_required` with no selection.
+The same invented records choose `economy-low` for cost, `fast-medium` for latency and `careful-high` for quality. **All three are fictional.** The thresholds illustrate the mechanism, not recommended production policy. Synthetic decisions cannot be dispatched.
 
-When you are ready to execute, `dispatch` sends the choice and task to **your explicitly named executable**. It is not a sandbox. See [the adapter contract](docs/integration.md); dispatch may incur costs or change files according to your adapter. The core itself makes no provider requests and changes no global agent configuration.
+## Evidence and honest boundaries
 
-## What v0.1 does
+**Experimental v0.2.0.** 29 offline tests passed. An independent agent read the Skill and exercised one real host worker request plus unsupported-switch and synthetic-preference scenarios. The worker returned the correct small task result. The requested model/effort pair was accepted, but the host supplied no independent effective-configuration readback. This is not a comparative model benchmark or savings claim.
 
-- Treat model + effort + harness as a configuration, without guessing capability from names.
-- Compare matching family/risk/rubric/harness records on shared case IDs.
-- Retain failed task costs and avoid counting reruns as independent cases.
-- Reject malformed, mismatched, future-dated or unsupported records; exclude stale and synthetic evidence by default.
-- Apply explicit empirical quality/sample gates before choosing the lowest known mean task cost.
-- Explain abstentions and fallback; explicitly gate fallback execution.
-- Pass the selected configuration to an adapter and save its accepted result as a new evidence record.
+The helper excludes runs whose configuration is unconfirmed, counts independent cases rather than repeated attempts, retains failure costs, and never treats missing costs as zero. User-supplied evidence declarations are not independently authenticated. Historical mean limits are not hard spend limits; enforce those in your executor.
 
-## What v0.1 does not do
+The Skill is an instruction-based agent decision workflow, not a trained classifier or universal automatic gateway. Classification accuracy, real economic benefit, global installation/discovery, provider adapters and broad cross-host compatibility remain unverified. See [method](docs/method.md) and [integration](docs/integration.md).
 
-It does not include a trained task classifier, provider integrations, native Promptfoo/LiteLLM importers, a benchmark runner, a live price catalog, or automatic escalation. Your host agent supplies classification; your evaluator judges completion; your adapter actually applies the model/effort settings. These components and end-to-end quality must be validated in your environment. Historical mean-cost limits are **not hard spending caps**. A timeout cannot reliably stop a remote request or every descendant process.
+## Related work
 
-## Why another tool?
+[OpenAI's model-selection guidance](https://developers.openai.com/api/docs/guides/model-selection), [RouteLLM](https://github.com/lm-sys/RouteLLM), [LiteLLM](https://docs.litellm.ai/docs/proxy/auto_routing), and existing model/effort skills from [enzoo808](https://github.com/enzoo808/model-effort-router) and [nyattoh](https://github.com/nyattoh/model-effort-router) already address related problems. We do not claim to invent recommendations, skills, feedback or routing.
 
-[RouteLLM](https://github.com/lm-sys/RouteLLM) already serves and evaluates routers. [LiteLLM](https://docs.litellm.ai/docs/proxy/auto_routing) already offers automatic classification and routing. [Promptfoo](https://www.promptfoo.dev/docs/configuration/expected-outputs/) evaluates outputs. [OpenAI](https://developers.openai.com/api/docs/guides/model-selection) already recommends evaluating model and reasoning effort together.
+Our focus is a small, inspectable personal loop: user priorities → local task outcomes → model + effort choice → actual supported application → verified outcome. Whether that improves real work remains something to measure.
 
-FitMyTask explores a narrower question: **Can a small, inspectable layer connect your task acceptance records to your next model-and-effort choice?** It complements those tools; it does not claim to invent evaluation or routing. See [the design](docs/design.md).
-
-## Contribute
-
-Useful contributions: reproducible task packs, robust acceptance checks, evaluator adapters, classification error analysis, and negative results. Please do not submit private prompts, proprietary code, credentials, or unsupported performance claims. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
-
-MIT licensed. Built with AI assistance; maintainers are responsible for review.
+MIT licensed. Contributions and negative results welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [source provenance](PROVENANCE.md).

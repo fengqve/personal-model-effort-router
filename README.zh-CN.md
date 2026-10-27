@@ -1,53 +1,56 @@
-# FitMyTask
+# Personal Model & Effort Router
 
-**用自己的任务验收证据，选择模型与推理档位。**
+**个性化大模型与推理档位路由：让 Agent 根据你的诉求和实际任务表现，选择并应用模型与档位。**
 
-[English](README.md) · [数据格式](docs/evidence.md) · [接入 Agent](docs/integration.md) · [方法与局限](docs/method.md)
+[English](README.md) · [Agent 入口](skills/route-model-effort/SKILL.md) · [验证记录](docs/verification.md)
 
-新模型发布、开始新项目、任务变难、质量下降、成本上升或工作流变化，都可能让原来的模型选择不再合适。
+官方推荐可以提供起点，但用户真正需要的是：在自己的工作流里，根据质量、速度、成本和以往结果，自动落实到每一次模型与档位选择。新模型发布只是触发重新考虑的一种情况。
 
-FitMyTask 是一个在本地运行的 Python 小工具：读取完整任务的评测记录，为下一个任务选择模型与推理档位，并解释依据。保留已有评测器和执行工具，通过显式适配器接入自动调用。
+## 用户怎么使用
 
-**当前为 v0.1.0 实验版。演示使用虚构模型和合成数据，没有真实模型优势、节省比例或分类准确率结论。**
+在 Agent 中打开仓库后，直接说：
 
-## 30 秒试用
+> 阅读 `skills/route-model-effort/SKILL.md`。接下来的任务请根据我的偏好和已有任务结果选择模型与推理档位。质量优先，证据不足时保留现有默认。只通过当前环境真正支持的接口应用，并说明实际应用情况。
 
-需要 Python 3.9+；没有运行时依赖，不需要 API Key、联网或安装。从仓库根目录运行：
+Agent 负责理解任务、读取偏好与记录、准备必要输入、选择配置、调用和验收。用户不需要先给任务分类、写 JSON 或操作命令行。
+
+支持 Agent Skills 的宿主可以通过其正常安装方式加载完整的 `skills/route-model-effort/` 文件夹；支持该语法时可使用 `$route-model-effort`。包内允许隐式调用，但何时被自动发现、是否每次任务都调用，取决于宿主。**安装 Skill 不等于获得模型切换接口，也不等于能拦截全部请求。** 本次没有修改用户的全局安装或配置。
+
+## Agent 的工作闭环
+
+1. 复用你的偏好、已有默认配置和当前真正可用的模型/档位。
+2. 判断任务的不确定性、上下文、验收方法和出错代价。
+3. 优先使用可比较的本地任务结果；证据不足时把官方建议作为初始参考。
+4. 在满足要求的前提下，按质量、速度或成本优先选择，不擅自降低验收标准。
+5. 通过支持的主会话、子代理或执行器入口应用，无法设置时如实说明。
+6. 检查结果，在已授权的本地记录范围内保留证据，供下次选择使用。
+
+如果环境只支持给子代理指定模型，就不能声称主代理已经切换；也不会为了制造“已切换”的效果而多开一个无必要的代理。用户的一次任务偏好不会自动改写长期默认。
+
+## 主要交付与底层工具
+
+**主要入口是 [Agent Skill](skills/route-model-effort/SKILL.md)。** Python 助手供 Agent 在需要确定性比较时使用，支持质量/速度/成本目标、可用候选过滤、共同任务比较、验收门槛、证据追溯和显式执行器桥接。
+
+需要人工检查演示时，可以运行：
 
 ```sh
-python3 -m fitmytask demo
-python3 -m unittest discover -s tests -v
+python3 skills/route-model-effort/scripts/route.py demo --objective quality
 ```
 
-也可从源码安装：`python3 -m pip install .`，随后使用 `fitmytask demo`。目前没有发布 PyPI 包。
+将目标改为 `cost` 或 `latency`，同一组合成记录会选择不同的虚构配置。演示没有调用真实模型，也不能用来宣称某个模型更好或已经省钱。
 
-演示比较六个共同样本：虚构的小模型低档通过 4/6、平均任务成本 $0.02；小模型高档通过 6/6、$0.08；大模型高档通过 6/6、$0.30。程序选择小模型高档，因为它在这组合成数据中满足验收门槛且成本更低。**这些数字不是任何真实模型的性能结论，模拟结果不能用于 dispatch。**
+## 当前证据与边界
 
-## 接入真实任务
+**v0.2.0 实验版。** 29 项离线测试通过。独立 Agent 读取 Skill 后，完成了一次真实宿主子代理请求，并正确完成小任务；请求中的模型与档位被接口接受，但没有实际生效配置的独立回读。另两个场景检查了无法切换主模型时的行为，以及合成数据下不同偏好的选择。
 
-1. 固定代表性任务、输入与验收标准，用已有评测器运行模型与档位组合。
-2. 按[数据格式](docs/evidence.md)记录完整任务，包括失败、重试、协调和返工；未知金额写 `null`。
-3. 由宿主 Agent 给新任务标注已知任务类别、风险、执行环境版本和验收标准；分类不确定时写 `classification_confirmed: false`。
-4. 生成可审阅的选择：
+因此，可以说入口和已测行为已验证；不能说分类准确率、真实模型优势或经济收益已证明。没有确认实际配置的运行记录不会用于后续模型能力校准。
 
-```sh
-python3 -m fitmytask route   --catalog private/catalog.json   --runs private/runs.jsonl   --task private/task.json
-```
-
-输出包含模型和档位、独立样本数、经验通过率、完整任务成本与耗时、不合格原因及局限。高风险或分类未确认时返回 `review_required`，不自动选择。
-
-需要执行时，通过 `dispatch` 将选择和任务交给显式指定的本地程序，并保存其结果记录。详见[接入协议](docs/integration.md)。适配器不是沙箱，可能按其自身权限产生费用或修改文件；工具核心不直接调用提供商，也不修改全局 Agent 配置。
-
-## 首版范围
-
-已实现模型与档位联合选择、相同任务集合比较、失败成本保留、重复样本去重、过期/合成证据隔离、门槛检查、选择解释，以及适配器调用和结果记录。
-
-尚未内置语义分类器、模型提供商适配器、Promptfoo/LiteLLM 原生导入、评测执行器、实时价目表或自动升级重试。分类由宿主 Agent 提供，完成判断由评测器负责，模型和档位由适配器实际应用。**历史平均成本上限不是本次调用的硬预算上限**；超时也不保证远程请求或所有子进程已终止。
+这不是训练好的分类模型或跨所有 Agent 自动生效的网关。安装发现、其他宿主兼容性、真实提供商适配器和端到端收益仍需验证。历史平均成本限制不是本次调用的硬预算；实际费用与工具权限由执行环境约束。
 
 ## 与已有工具的关系
 
-[RouteLLM](https://github.com/lm-sys/RouteLLM)、[LiteLLM](https://docs.litellm.ai/docs/proxy/auto_routing) 已有评测或自动路由能力，[Promptfoo](https://www.promptfoo.dev/docs/configuration/expected-outputs/) 提供输出评测，[OpenAI](https://developers.openai.com/api/docs/guides/model-selection) 已有模型与推理档位的选型指导。
+[OpenAI 的选型指导](https://developers.openai.com/api/docs/guides/model-selection)、[RouteLLM](https://github.com/lm-sys/RouteLLM)、[LiteLLM](https://docs.litellm.ai/docs/proxy/auto_routing) 以及 [enzoo808](https://github.com/enzoo808/model-effort-router)、[nyattoh](https://github.com/nyattoh/model-effort-router) 的模型/档位路由项目已覆盖相关问题。
 
-我们探索的是更小的一环：让你自己的任务验收记录直接参与下一次模型和档位选择，并把依据保留下来。不声称首次发明评测、路由，也不声称官方完全没有相关能力。
+本项目关注把**个人诉求、本地任务表现与真实运行时设置**连接起来，不宣称官方没有推荐，也不宣称首次发明路由。这个闭环能否改善真实工作，仍需要实际验证。
 
-欢迎贡献可复现任务、验收标准、适配器、分类错误分析和失败结果。提交前移除私有资料和凭证。采用 MIT 许可证；使用 AI 协助开发，维护者负责审阅。
+采用 MIT 许可证。欢迎贡献可复现任务、验收标准、宿主适配和失败结果；不要提交私有聊天、凭证或未经授权的任务资料。

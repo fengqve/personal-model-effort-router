@@ -8,7 +8,9 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
+ROUTE = ROOT / 'skills/route-model-effort/scripts/route.py'
 
 
 class CLITests(unittest.TestCase):
@@ -25,11 +27,15 @@ class CLITests(unittest.TestCase):
                       'harness': 'h', 'rubric': 'r', 'candidate_id': 'a', 'model': 'mock-model',
                       'effort': 'low', 'passed': True, 'total_cost_usd': 1,
                       'total_duration_seconds': 2, 'completed_at': datetime.now(timezone.utc).isoformat(),
-                      'source': 'observed', 'evidence': '模拟适配器测试证据'}]
+                      'source': 'observed', 'evidence': '模拟适配器测试证据', 'configuration_confirmed': True}]
         self.record = self.dir / 'record.json'
         self.marker = self.dir / 'adapter-calls.jsonl'
         self.adapter = self.dir / 'mock adapter.py'
-        self.adapter.write_text('''import json, pathlib, sys\nrequest = json.load(sys.stdin)\nmarker = pathlib.Path(sys.argv[1])\nwith marker.open("a", encoding="utf-8") as f:\n    f.write(json.dumps({"argv": sys.argv[2:], "request": request}, ensure_ascii=False) + "\\n")\nmode = sys.argv[2]\nif mode == "failure":\n    sys.exit(7)\nif mode == "invalid":\n    print("not-json")\n    sys.exit(0)\nif mode == "invalid-fields":\n    print(json.dumps({"passed": True}))\n    sys.exit(0)\nprint(json.dumps({"passed": mode != "failed-task", "total_cost_usd": 1.25,\n                  "total_duration_seconds": 3, "evidence": "模拟证据",\n                  "output": "中文结果"}, ensure_ascii=False))\n''', encoding='utf-8')
+        self.adapter.write_text('''import json, pathlib, sys\nrequest = json.load(sys.stdin)\nmarker = pathlib.Path(sys.argv[1])\nwith marker.open("a", encoding="utf-8") as f:\n    f.write(json.dumps({"argv": sys.argv[2:], "request": request}, ensure_ascii=False) + "\\n")\nmode = sys.argv[2]\nif mode == "failure":\n    sys.exit(7)\nif mode == "invalid":\n    print("not-json")\n    sys.exit(0)\nif mode == "invalid-fields":\n    print(json.dumps({"passed": True}))\n    sys.exit(0)\napplied = {key: request["selected"][key] for key in ("model", "effort", "harness")}
+if mode == "mismatch":
+    applied["model"] = "wrong-model"
+config = {} if mode == "missing-config" else {"applied_config": applied}
+print(json.dumps({**config, "passed": mode != "failed-task", "total_cost_usd": 1.25,\n                  "total_duration_seconds": 3, "evidence": "模拟证据",\n                  "output": "中文结果"}, ensure_ascii=False))\n''', encoding='utf-8')
 
     def files(self):
         for name, data in (('catalog.json', self.catalog), ('task.json', self.task)):
@@ -39,12 +45,12 @@ class CLITests(unittest.TestCase):
                 '--task', str(self.dir / 'task.json')]
 
     def cli(self, *args):
-        return subprocess.run([sys.executable, '-m', 'fitmytask', *args], cwd=ROOT, text=True,
+        return subprocess.run([sys.executable, '-B', str(ROUTE), *args], cwd=ROOT, text=True,
                               capture_output=True, timeout=10, check=False)
 
     def dispatch(self, mode='success', *extra, options=()):
         return self.cli('dispatch', *self.files(), *options, '--record-to', str(self.record),
-                        '--adapter', sys.executable, str(self.adapter), str(self.marker), mode, *extra)
+                        '--adapter', sys.executable, '-B', str(self.adapter), str(self.marker), mode, *extra)
 
     def test_demo_is_explicitly_simulation(self):
         result = self.cli('demo')
@@ -85,6 +91,7 @@ class CLITests(unittest.TestCase):
         record = json.loads(self.record.read_text(encoding='utf-8'))
         self.assertEqual((record['source'], record['passed'], record['evidence']), ('observed', True, '模拟证据'))
         self.assertEqual(record['case_id'], '中文任务')
+        self.assertTrue(record['configuration_confirmed'])
         calls = self.marker.read_text(encoding='utf-8').splitlines()
         self.assertEqual(len(calls), 1)
         request = json.loads(calls[0])
@@ -133,6 +140,26 @@ class CLITests(unittest.TestCase):
                 self.assertEqual(json.loads(self.record.read_text(encoding='utf-8'))['status'], 'execution_unverified')
                 self.assertEqual(len(self.marker.read_text(encoding='utf-8').splitlines()), 1)
 
+
+    def test_missing_applied_config_is_unconfirmed_and_not_calibration_evidence(self):
+        result = self.dispatch('missing-config')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = json.loads(self.record.read_text(encoding='utf-8'))
+        self.assertFalse(record['configuration_confirmed'])
+        args = self.files()
+        args.insert(args.index('--task'), str(self.record))
+        result = self.cli('route', *args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['candidates'][0]['n'], 1)
+
+    def test_mismatched_applied_config_is_unverified(self):
+        result = self.dispatch('mismatch')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        record = json.loads(self.record.read_text(encoding='utf-8'))
+        self.assertEqual(record['status'], 'execution_unverified')
+        self.assertNotIn('candidate_id', record)
+        self.assertNotIn('configuration_confirmed', record)
+        self.assertEqual(len(self.marker.read_text(encoding='utf-8').splitlines()), 1)
 
 if __name__ == '__main__':
     unittest.main()

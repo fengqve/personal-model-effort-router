@@ -5,5 +5,6 @@
   "harness": "demo-v1",
   "rubric": "tests-and-review-v1",
   "classification_confirmed": true,
-  "prompt": "Fictional task used to demonstrate routing only."
+  "prompt": "Fictional task used to demonstrate routing only.",
+  "objective": "quality"
 }

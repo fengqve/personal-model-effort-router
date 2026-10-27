@@ -1,48 +1,25 @@
-# Product design / 产品设想
+# Product design
 
-## User and value hypothesis
+## Outcome
 
-Start with individual developers and small teams already using an agent and capable of judging whether a task is complete. They currently select models manually or keep a fixed default. FitMyTask should make that choice inspectable and repeatable using their own work. This is a demand hypothesis, not validated product-market fit.
+The user gives an Agent a task and priorities. The Agent selects and applies an available model/effort configuration based on the user's task outcomes and preferences, preserves evidence, and improves future decisions. The user reviews meaningful tradeoffs rather than labels tasks or runs routing commands.
 
-中文定位：把“凭印象选模型和档位”变成“用自己的任务验收记录作选择”，逐步减少重复试错。
+Official recommendations are useful priors. The product gap is connecting them to personal outcomes, preferences and actual runtime application, not the absence of recommendations.
 
-## More than model launches
+## Entry and scope
 
-| Trigger | Necessary observation | Response |
-| --- | --- | --- |
-| New model or effort option | Exact supported deployment configuration | Add a candidate; do not promote it without comparable runs |
-| New project/task family | Representative cases and acceptance checks | Keep known default or review until evidence exists |
-| Quality decline | Actual failed outcomes, not model self-confidence | Review classification/rubric/harness; collect matched reruns |
-| Cost or deadline changes | Complete task costs/durations | Apply reviewed empirical limits; enforce hard caps in the executor |
-| Prompt/tool/context changes | New harness revision | Separate old evidence; recalibrate |
-| New team or provider | Different permissions, tool stack, task distribution | Treat prior public evidence as a hypothesis to validate locally |
+Primary entry: route-model-effort Agent Skill. Optional implementation helper: deterministic Python comparison and executor bridge. No new hosted gateway, background service, account, trained classifier or mandatory benchmark campaign.
 
-v0.1 reacts when invoked with updated input files. It has no background monitoring or automatic event subscription.
+Model release, new task/project, changed preferences, poorer outcomes, tool/prompt/context changes can all trigger reconsideration. On a cold start, retain the user's existing baseline and make uncertainty visible. Normal authorized work can produce useful records without an up-front benchmarking bill. Explicit calibration remains separately scoped work with representative frozen tasks, acceptance criteria, held-out cases and spending/retry limits.
 
-## Core interaction
+## Boundaries that affect the product
 
-User/host describes a task → host classifies against known families → router checks evidence → shows selected/review/fallback plus reasons → authorized adapter executes → evaluator returns acceptance and complete cost → an immutable result is available for the next routing run.
+An Agent can only use controls actually exposed by its host. The product must say whether it applied a current-session change, a worker/new-run configuration, or merely made a recommendation. A Skill cannot provide missing privileges. A model-and-effort pair accepted by an interface is a requested setting until the runtime confirms the effective values.
 
-The user may inspect every decision, but an integration can automate accepted low/medium-risk decisions. High risk and uncertainty remain explicit. A result that fails acceptance is retained and returns a nonzero exit; v0.1 does not silently retry or select a stronger model.
+Quality, latency and cost are user-selected objectives, not fixed cheapness. Existing constraints remain gates. Unknown money, quota, human effort or effective model identity stays unknown. Broad tasks should not be classified by a single technology keyword. Risk and task acceptance change the route even within one project.
 
-## Smallest useful first release
+Feedback can change evidence used for subsequent decisions. It does not silently modify long-term preferences, permissions or global defaults. Permanent configuration changes are distinct from selecting an authorized per-task model.
 
-A standard-library Python library and CLI with JSON/JSONL records, source install, one offline demo, unit/integration tests, and a documented adapter contract. No service, accounts, hosted leaderboard, telemetry, global configuration edits, or new Agent Skill. Reasoning effort remains an explicit string attached to each candidate; names do not imply rankings.
+## Validation still needed
 
-Automatic classification belongs to the host model in v0.1. This avoids paying for a new classifier before we know it helps. It also means classification is not yet a validated feature of this repository. The next experiment must test the full host→router→executor loop, not only selection on correct labels.
-
-## Evidence needed before larger claims
-
-1. Real paired runs on versioned tasks, with hard acceptance checks and independent review where needed.
-2. Held-out cases for the routing policy. Do not select and report final performance on the same cases.
-3. Classification confusion/errors on unseen tasks, including ambiguity and high-risk cases.
-4. Routed vs fixed-default complete outcomes, including classification, evaluation, coordination, fallback, retries, cache conditions, human rework and total cost.
-5. A user other than the author can import their own results and understand an abstention without help.
-
-No numeric savings target is promised. Keep the first real trial small and explicitly budgeted before paid execution.
-
-## Publication and follow-through
-
-Release as an experimental evidence-to-routing tool. Show the offline simulation labelled as such. Invite reproducible task packs and integration feedback rather than likes as proof of demand. Record whether outside users can complete the import→decision→execution loop. Broaden only when that works.
-
-Planned next steps, not implemented promises: native evaluator imports; validated host classification; paid/local real model trial with cost ceiling; comparative policy evaluation; executor-specific bounded escalation; portable evidence contributions. No release dates are promised.
+Real user adoption; held-out task classification; exact provider/host settings; paired real model trials; fixed-default versus routed completion quality and total parent/child/coordination/retry/rework cost. No savings target or delivery timeline is promised. Public evidence may seed hypotheses; it cannot establish performance in another user's environment.

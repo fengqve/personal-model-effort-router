@@ -1,11 +1,11 @@
 # Contributing
 
-Use Python 3.9+ and run `python3 -m unittest discover -s tests -v` and `python3 -m fitmytask demo` from the repository root. Runtime code uses the standard library.
+Useful contributions include reproducible task/acceptance packs, classification error analysis, honest negative outcomes, runtime configuration readback and verified host adapters. We do not need unsupported model rankings or another fixed cheapest-model table.
 
-Please open a focused issue or pull request describing the task, reproducible input, expected decision, and actual result. Include a regression case for policy changes. Preserve synthetic/observed separation and failure accounting.
+Run `python3 -B -m unittest discover -s tests -v` and `python3 skills/route-model-effort/scripts/route.py demo --objective quality` from the repository root. Runtime code has no third-party dependencies.
 
-Task/evidence contributions must state: consent to publish; frozen input and license; task family and risk; rubric and reviewer/evaluator; exact model/effort and harness revision; all attempts including failures; dates and accounting coverage; what was held out. Anonymization is not automatic. Never submit credentials, private URLs, personal identifiers, private chat history, unlicensed source material, or proprietary tasks without permission. Prefer small independently written public fixtures.
+The source of truth for the complete Skill is `skills/route-model-effort` in the maintainer's agent-skills monorepo, as recorded in [PROVENANCE.md](PROVENANCE.md). This repository contains the release export plus public documentation and tests. Propose changes through an issue/PR; maintainers reconcile runtime changes into the source monorepo, validate and version them there, then refresh the export. Do not develop in installed Skill directories.
 
-Do not infer model quality from synthetic examples, incomplete tasks, unavailable prices, model self-assessment, or a single successful attempt. Negative results and reproducible abstentions are useful contributions.
+Task/evidence submissions need permission to publish, frozen inputs and license, family/risk/rubric, exact runtime configuration and its confirmation, all failures/attempts, accounting gaps and held-out status. Do not submit private chat history, proprietary source, credentials, private links or personal identifiers. Synthetic fixtures remain clearly synthetic; model self-reports do not prove completion or effective settings.
 
-There is no hosted evidence upload service. Contributions are reviewed through GitHub. The local router never executes commands found in task or evidence data; only the command supplied explicitly to dispatch is executed. That command has the caller's permissions and is not sandboxed.
+Per-task choices do not grant new permissions or silently change global defaults. Tests must preserve this boundary and the distinction between recommended, requested, confirmed and accepted outcomes.
