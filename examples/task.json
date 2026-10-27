@@ -1,0 +1,9 @@
+{
+  "id": "new-demo-task",
+  "family": "bounded-edit",
+  "risk": "low",
+  "harness": "demo-v1",
+  "rubric": "tests-and-review-v1",
+  "classification_confirmed": true,
+  "prompt": "Fictional task used to demonstrate routing only."
+}

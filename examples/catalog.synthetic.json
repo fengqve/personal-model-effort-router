@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "candidates": [
+    {
+      "id": "small-low",
+      "model": "fictional-small-v1",
+      "effort": "low",
+      "harness": "demo-v1"
+    },
+    {
+      "id": "small-high",
+      "model": "fictional-small-v1",
+      "effort": "high",
+      "harness": "demo-v1"
+    },
+    {
+      "id": "large-high",
+      "model": "fictional-large-v1",
+      "effort": "high",
+      "harness": "demo-v1"
+    }
+  ],
+  "fallback": "large-high",
+  "policy": {
+    "min_cases": 5,
+    "min_pass_rate": 1.0,
+    "max_age_days": 30
+  }
+}
